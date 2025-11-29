@@ -1434,7 +1434,7 @@ class ImpressionAffectionPlugin(BasePlugin):
 
     config_schema: dict = {
         "plugin": {
-            "config_version": ConfigField(type=str, default="1.0.0", description="配置文件版本"),
+            "config_version": ConfigField(type=str, default="1.1.1", description="配置文件版本"),
             "enabled": ConfigField(type=bool, default=False, description="是否启用插件"),
         },
         "llm_provider": {
@@ -1504,26 +1504,7 @@ class ImpressionAffectionPlugin(BasePlugin):
             ),
             "weight_evaluation_prompt": ConfigField(
                 type=str,
-                default="""你是一个消息权重评估助手。请根据消息内容的价值和信息量，为每条消息评估权重分数。
-
-权重分级标准：
-- 高权重 (70-100): 包含重要个人信息、情感表达、独特观点、深度话题等
-- 中权重 (40-69): 有一定信息量，但不是特别重要
-- 低权重 (0-39): 简单的问候、客套话、无实质内容的互动
-
-回复要求：
-1. 只返回JSON格式
-2. 不要包含任何解释或其他内容
-
-JSON格式：
-{{
-    "weight_score": 权重分数(0-100的浮点数),
-    "weight_level": "权重等级(high/medium/low)",
-    "reason": "评估原因"
-}}
-
-用户消息: {message}
-上下文: {context}""",
+                default="你是一个消息权重评估助手。请根据消息内容的价值和信息量，为每条消息评估权重分数。\n\n权重分级标准：\n- 高权重 (70-100): 包含重要个人信息、情感表达、独特观点、深度话题等\n- 中权重 (40-69): 有一定信息量，但不是特别重要\n- 低权重 (0-39): 简单的问候、客套话、无实质内容的互动\n\n回复要求：\n1. 只返回JSON格式\n2. 不要包含任何解释或其他内容\n\nJSON格式：\n{{\n    \"weight_score\": 权重分数(0-100的浮点数),\n    \"weight_level\": \"权重等级(high/medium/low)\",\n    \"reason\": \"评估原因\"\n}}\n\n用户消息: {message}\n上下文: {context}",
                 description="权重评估提示词模板（支持 {message}、{context} 占位符）"
             ),
         },
@@ -1535,44 +1516,12 @@ JSON格式：
         "prompts": {
             "impression_template": ConfigField(
                 type=str,
-                default="""你是一个印象分析助手。请根据用户的消息生成简洁的印象描述。
-
-要求：
-- 印象描述要简洁明了，20-40字
-- 保持与历史印象的一致性
-- 关注用户的性格特点、行为习惯、情感倾向
-
-请以JSON格式返回：
-{{
-    "impression": "印象描述",
-    "reason": "形成这个印象的原因"
-}}
-
-{history_context}
-
-用户消息: {message}
-上下文: {context}""",
+                default="你是一个印象分析助手。请根据用户的消息生成简洁的印象描述。\n\n要求：\n- 印象描述要简洁明了，20-40字\n- 保持与历史印象的一致性\n- 关注用户的性格特点、行为习惯、情感倾向\n\n请以JSON格式返回：\n{{\n    \"impression\": \"印象描述\",\n    \"reason\": \"形成这个印象的原因\"\n}}\n\n{history_context}\n\n用户消息: {message}\n上下文: {context}",
                 description="印象分析提示词模板（支持 {history_context}、{message}、{context} 占位符）"
             ),
             "affection_template": ConfigField(
                 type=str,
-                default="""你是一个情感分析师。请评估用户消息的情感倾向，并给出好感度影响建议。
-
-回复要求：
-1. 只返回JSON格式，不要包含其他内容
-2. 评估标准：
-   - friendly: 友善的评论（赞美、鼓励、感谢等）
-   - neutral: 中性的评论（客观陈述、信息性消息等）
-   - negative: 差劲的评论（批评、讽刺、攻击等）
-
-JSON格式：
-{{
-    "type": "评论类型（friendly/neutral/negative）",
-    "reason": "评估原因"
-}}
-
-用户消息: {message}
-上下文: {context}""",
+                default="你是一个情感分析师。请评估用户消息的情感倾向，并给出好感度影响建议。\n\n回复要求：\n1. 只返回JSON格式，不要包含其他内容\n2. 评估标准：\n   - friendly: 友善的评论（赞美、鼓励、感谢等）\n   - neutral: 中性的评论（客观陈述、信息性消息等）\n   - negative: 差劲的评论（批评、讽刺、攻击等）\n\nJSON格式：\n{{\n    \"type\": \"评论类型（friendly/neutral/negative）\",\n    \"reason\": \"评估原因\"\n}}\n\n用户消息: {message}\n上下文: {context}",
                 description="好感度评估提示词模板（支持 {message}、{context} 占位符）"
             ),
         },
