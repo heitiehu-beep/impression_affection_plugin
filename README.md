@@ -1,130 +1,191 @@
-# 印象好感度系统插件
+# 印象和好感度系统插件 v2.0.0
 
-一个基于LLM的智能印象和好感度分析系统，能够持续跟踪用户的性格特征和行为模式。
+基于LLM分析用户行为和消息，构建用户画像并维护好感度关系
+
+## 系统概述
+
+本插件实现基于LLM的用户印象和好感度管理系统，通过智能分析用户消息内容，构建多维度用户画像，并动态维护好感度关系。
 
 ## 核心功能
 
-### 必触发机制
-- **印象构建**: 每次收到消息时必定执行，持续积累用户特征
-- **好感度更新**: 每次收到消息时必定执行，及时响应情感变化
-- **由planner决定**: 当planner决定使用"reply"动作时，插件必定运行
-- **无频率限制**: 不再依赖消息数量阈值，每次调用都会执行
+### 印象构建系统
+- 自动分析用户消息内容，提取性格特征和兴趣偏好
+- 采用8维度印象表示：性格特征、兴趣爱好、交流风格、情感倾向、行为模式、价值观态度、关系偏好、成长发展
+- 实现权重筛选机制，仅对高价值消息更新印象
+- 支持增量式印象更新，避免重复处理
 
-### 权重筛选系统
-- 使用LLM评估每条消息的价值和权重
-- 自动过滤低价值消息（问候、客套话等）
-- 只将高价值消息用于印象构建，提高准确性和效率
-- 可配置阈值：选择性（仅高权重）或平衡性（高+中权重）
+### 好感度管理
+- 三级情感分类：友善、中性、负面
+- 动态分数调整：0-100分制，支持自定义权重配置
+- 等级自动划分：非常差、很差、较差、一般、较好、很好、非常好
+- 历史消息统计和趋势追踪
 
-### 增量消息处理
-- 使用 `UserMessageState` 表跟踪消息状态
-- 自动去重，避免重复处理相同消息
-- 限制上下文条目数量，进一步节省token
-- 每次触发最多处理指定数量的消息
+### 智能筛选机制
+- 消息权重评估：高权重(70-100)、中权重(40-69)、低权重(0-39)
+- 三种筛选模式：禁用筛选、选择性筛选、平衡筛选
+- 上下文管理：智能选取高质量历史消息用于印象构建
 
-### 向量化存储
-- 使用嵌入模型生成文本向量
-- 支持向量相似度搜索
-- 支持上下文检索和智能匹配
+## 技术架构
 
-### 持续学习
-- 每次消息都会更新印象和好感度
-- 保持历史印象的一致性
-- 动态跟踪用户特征变化
+### 服务层架构
+- TextImpressionService：印象构建和文本分析
+- AffectionService：好感度评估和动态调整
+- WeightService：消息权重评估和筛选
+- MessageService：消息状态跟踪和去重
 
-## 插件触发机制
+### 组件系统
+- 工具组件：GetUserImpressionTool、SearchImpressionsTool
+- 命令组件：ViewImpressionCommand、SetAffectionCommand、ListImpressionsCommand
+- 事件处理：ImpressionUpdateHandler
 
-### 激活类型: ALWAYS
-该插件使用 ALWAYS 激活类型，这意味着：
-- 插件会在planner决定使用"reply"动作时必定运行
-- 不需要LLM判定触发条件
-- 每次用户消息都会被处理（除非被权重筛选过滤）
+### 数据模型
+- UserImpression：用户印象和好感度数据
+- UserMessageState：用户消息状态统计
+- ImpressionMessageRecord：消息处理记录
 
-### 触发频率
-- **v1.2.0**: 每次收到消息时必定执行，无频率限制
-- **v1.1.x及之前**: 基于消息数量阈值，需要达到一定消息数才触发
+## 配置说明
 
-## 配置选项
-
-### 基础配置
+### LLM提供商配置
 ```toml
-[plugin]
-enabled = true  # 是否启用插件
+[llm_provider]
+provider_type = "openai"  # 或 "custom"
+api_key = "your-api-key"
+base_url = "https://api.openai.com/v1"
+model_id = "gpt-3.5-turbo"
 ```
 
 ### 权重筛选配置
 ```toml
 [weight_filter]
-enabled = true  # 是否启用权重筛选
-filter_mode = "selective"  # 筛选模式: disabled(禁用)/selective(仅高权重)/balanced(高+中权重)
-high_weight_threshold = 70.0  # 高权重消息阈值(0-100)
-medium_weight_threshold = 40.0  # 中权重消息阈值(0-100)
+filter_mode = "selective"  # disabled/selective/balanced
+high_weight_threshold = 70.0
+medium_weight_threshold = 40.0
 ```
 
-### 印象分析配置
+### 好感度增量配置
 ```toml
-[impression]
-max_context_entries = 30  # 每次触发时获取的上下文条目上限
+[affection_increment]
+friendly_increment = 2.0
+neutral_increment = 0.5
+negative_increment = -3.0
 ```
 
-### LLM提示词模板
-```toml
-[prompts]
-# 自定义LLM提示词内容，支持占位符
-weight_evaluation_prompt = "你是一个消息权重评估助手..."
-impression_template = "你是一个印象分析助手..."
-affection_template = "你是一个情感分析师..."
+## 安装和部署
+
+### 环境要求
+- Python 3.11+
+- MaiBot 0.11.0+
+
+### 依赖安装
+```bash
+cd ~/MaiBot/plugins/impression_affection_plugin-main
+pip install -r requirements.txt
 ```
 
-## 数据库表
+### 配置文件
+插件首次启动时会自动生成 `config.toml` 配置文件，请根据需要修改LLM API配置。
 
-### UserImpression
-存储用户印象数据
-- `user_id`: 用户唯一标识
-- `impression_text`: 印象描述文本
-- `impression_vector`: 印象向量（用于相似度搜索）
-- `last_updated`: 最后更新时间
+## 使用指南
 
-### UserAffection
-存储用户好感度数据
-- `user_id`: 用户唯一标识
-- `affection_score`: 好感度分数
-- `affection_level`: 好感度等级
-- `change_reason`: 变化原因
-- `last_updated`: 最后更新时间
+### 自动功能
+- 插件启动后自动监听LLM回复事件
+- 智能分析用户消息并更新印象和好感度
+- 支持权重筛选，仅处理有价值的信息
 
-### UserMessageState
-跟踪用户消息状态
-- `user_id`: 用户唯一标识
-- `total_messages`: 总消息数
-- `impression_update_count`: 印象更新计数
-- `affection_update_count`: 好感度更新计数
+### 手动命令（暂时没用）
+- `/impression view <user_id>` - 查看用户印象信息
+- `/impression set <user_id> <score>` - 设置好感度分数
+- `/impression list` - 列出所有用户印象
 
-### MessageRecord
-存储消息记录
-- `user_id`: 用户唯一标识
-- `message_id`: 消息唯一标识
-- `message_content`: 消息内容
-- `message_vector`: 消息向量
-- `weight_score`: 权重分数
-- `processed`: 是否已处理
+### LLM工具
+- `get_user_impression` - 获取用户印象数据
+- `search_impressions` - 搜索印象中的关键词
 
-## 依赖要求
+## 数据库结构
 
-### 必需
-- MaiBot 插件系统
-- LLM服务 (用于分析)
-- 嵌入模型服务 (用于向量存储和相似度搜索)
+### user_impressions 表
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| user_id | TEXT | 用户ID（唯一） |
+| personality_traits | TEXT | 性格特征描述 |
+| interests_hobbies | TEXT | 兴趣爱好描述 |
+| communication_style | TEXT | 交流风格描述 |
+| emotional_tendencies | TEXT | 情感倾向描述 |
+| behavioral_patterns | TEXT | 行为模式描述 |
+| values_attitudes | TEXT | 价值观态度描述 |
+| relationship_preferences | TEXT | 关系偏好描述 |
+| growth_development | TEXT | 成长发展描述 |
+| affection_score | REAL | 好感度分数(0-100) |
+| affection_level | TEXT | 好感度等级 |
+| message_count | INTEGER | 累计消息数 |
+| last_interaction | DATETIME | 最后交互时间 |
+| created_at | DATETIME | 创建时间 |
+| updated_at | DATETIME | 更新时间 |
 
-## 使用建议
+### user_message_state 表
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| user_id | TEXT | 用户ID（唯一） |
+| last_message_id | TEXT | 最后消息ID |
+| last_message_time | DATETIME | 最后消息时间 |
+| impression_update_count | INTEGER | 印象更新次数 |
+| affection_update_count | INTEGER | 好感度更新次数 |
+| total_messages | BIGINT | 总消息数 |
+| processed_messages | BIGINT | 已处理消息数 |
 
-1. **配置LLM服务**: 确保LLM服务正常工作，这是核心依赖
-2. **配置嵌入模型**: 必需，插件依赖向量化存储和相似度搜索功能
-3. **调整权重阈值**: 根据需要调整权重筛选的阈值
-4. **监控日志**: 观察插件运行日志，确保正常执行
+### impression_message_records 表
+| 字段名 | 类型 | 说明 |
+|--------|------|------|
+| user_id | TEXT | 用户ID |
+| message_id | TEXT | 消息ID |
+| impression_id | TEXT | 印象记录ID |
+| processed_at | DATETIME | 处理时间 |
 
-## 注意事项
+## 开发说明
 
-- 插件会持续分析每条消息，可能产生一定的token消耗
-- 权重筛选可以帮助减少无效消息的处理
-- 建议定期清理旧的数据库记录以节省存储空间
+### 插件结构
+```
+impression_affection_plugin-main/
+├── plugin.py              # 主插件文件
+├── config.toml           # 配置文件
+├── requirements.txt      # 依赖列表
+├── models/               # 数据模型
+├── services/             # 服务层
+├── components/           # 组件
+├── clients/              # 客户端
+└── utils/               # 工具函数
+```
+
+### 扩展开发
+- 添加新的印象维度：修改 `UserImpression` 模型
+- 自定义权重算法：扩展 `WeightService`
+- 新增命令组件：继承 `BaseCommand`
+- 添加工具组件：继承 `BaseTool`
+
+## 故障排除
+
+### 常见问题
+1. **插件加载失败**：检查配置文件格式和API密钥
+2. **印象不更新**：确认LLM API连接正常
+3. **权重评估异常**：检查提示词配置和模型响应
+4. **数据库错误**：确认文件权限和磁盘空间
+
+### 调试模式
+在配置文件中设置 `plugin.enabled = false` 可临时禁用插件，用于调试。
+
+## 版本历史
+
+### v2.0.0
+- 重构为纯LLM文本存储版本
+- 移除向量化功能，简化架构
+- 优化8维度印象系统
+- 改进权重筛选机制
+- 完善配置管理系统
+
+## 许可证
+
+MIT License
+
+## 作者
+
+HEITIEHU

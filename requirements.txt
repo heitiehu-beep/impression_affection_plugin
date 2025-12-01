@@ -1,0 +1,10 @@
+# 印象和好感度系统插件依赖
+
+# 数据库ORM
+peewee>=3.17.0
+
+# OpenAI API客户端
+openai>=1.0.0
+
+# HTTP客户端（用于自定义API调用）
+httpx>=0.25.0
