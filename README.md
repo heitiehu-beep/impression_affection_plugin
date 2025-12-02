@@ -57,9 +57,9 @@
 - 智能时序控制，确保查重准确性
 
 ### 插件数据库
--自动生成的impression_affection_data.db文件
--可随时删除重新生成
--使用SQL管理
+- 自动生成的impression_affection_data.db文件
+- 可随时删除重新生成
+- 使用SQLite
 
 ## 配置说明
 
