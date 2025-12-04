@@ -358,7 +358,7 @@ class ImpressionAffectionPlugin(BasePlugin):
             ),
             "config_version": ConfigField(
                 type=str,
-                default="2.2.0",
+                default="2.2.5",
                 description="配置文件版本"
             )
         },
@@ -534,14 +534,16 @@ class ImpressionAffectionPlugin(BasePlugin):
         "prompts": {
             "impression_template": ConfigField(
                 type=str,
-                default="请基于用户的聊天记录生成印象描述，用专业和细致的语言描述这个人的性格特点、兴趣爱好、交流方式等，长度50-100字。要求语言自然流畅。如果信息不足，可以适当推测并用'似乎'、'看起来'等词。历史对话: {history_context} 当前消息: {message}",
+                default="你是一位有心理学背景的敏锐观察者，擅长从对话中洞察他人的性格特质和内心世界。现有印象：{existing_impression} 历史对话：{history_context} 当前消息：{message} 请基于对话信息，用自然的方式描述你对这个人的印象。要求：如果有现有印象，在保留准确认知的基础上融入新发现；如果没有，则构建初始印象。重点是把握这个人的核心性格特征、情感特点和行为倾向，用贴近日常印象的语言表达，避免生硬的术语堆砌。描述要有深度但不刻板，专业但不疏离，像是有洞察力的人对他人形成的真实感受。100字左右。",
                 description="印象分析提示词模板"
             ),
+            
             "affection_template": ConfigField(
                 type=str,
                 default="评估用户消息情感倾向（friendly/neutral/negative）。只返回键值对格式：TYPE: friendly/neutral/negative;REASON: 评估原因;消息: {message}",
                 description="好感度评估提示词模板"
             )
+        },
         },
 
         # =============================================================================

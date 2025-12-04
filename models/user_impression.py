@@ -30,6 +30,11 @@ class UserImpression(Model):
     message_count = IntegerField(default=0)  # 累计消息数
     last_interaction = DateTimeField(default=datetime.now)  # 最后交互时间
     
+    # 印象版本控制
+    impression_version = IntegerField(default=1)  # 印象版本号
+    previous_impression = TextField(default="")  # 上一次的印象(用于对比)
+    impression_update_count = IntegerField(default=0)  # 印象更新次数
+    
     # 时间戳
     created_at = DateTimeField(default=datetime.now)
     updated_at = DateTimeField(default=datetime.now)
@@ -44,6 +49,31 @@ class UserImpression(Model):
     def update_timestamps(self):
         """更新时间戳"""
         self.updated_at = datetime.now()
+    
+    def increment_impression_version(self):
+        """增加印象版本号"""
+        self.impression_version += 1
+        self.impression_update_count += 1
+        self.update_timestamps()
+    
+    def set_impression_with_version(self, new_impression: str):
+        """设置新印象并更新版本信息"""
+        # 保存当前印象为历史印象
+        if self.personality_traits:
+            self.previous_impression = self.personality_traits
+        
+        # 设置新印象
+        self.personality_traits = new_impression
+        
+        # 更新版本信息
+        self.increment_impression_version()
+    
+    def get_impression_change_summary(self) -> str:
+        """获取印象变化摘要"""
+        if not self.previous_impression:
+            return f"初始印象 (版本 {self.impression_version})"
+        
+        return f"从版本 {self.impression_version - 1} 更新到版本 {self.impression_version}"
 
     def get_impression_summary(self) -> str:
         """获取印象摘要"""

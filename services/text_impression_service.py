@@ -37,11 +37,14 @@ class TextImpressionService:
             (是否成功, 印象描述)
         """
         try:
+            # 获取用户现有印象
+            existing_impression = self._get_existing_impression(user_id)
+            
             # 获取增强的历史上下文
             enhanced_context = await self._get_enhanced_context(user_id, history_context)
             
-            # 生成提示词
-            prompt = self._build_prompt(enhanced_context, message)
+            # 生成更新提示词
+            prompt = self._build_update_prompt(existing_impression, enhanced_context, message)
             
             # 调用LLM生成印象
             success, content = await self.llm_client.generate_impression_analysis(prompt)
@@ -56,10 +59,10 @@ class TextImpressionService:
                 # 清理印象结果，确保纯中文输出
                 cleaned_impression = self._clean_impression_text(impression_result)
                 
-                # 保存印象
-                success = self._save_impression(user_id, cleaned_impression)
+                # 保存印象（使用更新方式）
+                success = self._save_impression_update(user_id, cleaned_impression)
                 if success:
-                    logger.debug(f"印象保存成功")
+                    logger.debug(f"印象更新成功")
                     return True, cleaned_impression
                 else:
                     logger.warning(f"印象保存失败")
@@ -245,7 +248,7 @@ class TextImpressionService:
 
     def _save_impression(self, user_id: str, impression_text: str) -> bool:
         """
-        保存用户印象到数据库
+        保存用户印象到数据库（直接覆盖方式）
         
         Args:
             user_id: 用户ID
@@ -269,6 +272,113 @@ class TextImpressionService:
                 impression.personality_traits = impression_text
                 impression.update_timestamps()
                 impression.save()
+            
+            logger.debug(f"印象已保存: 用户 {user_id}, 印象: {impression_text[:50]}...")
+            return True
+            
+        except Exception as e:
+            logger.error(f"保存印象失败: {str(e)}")
+            return False
+    
+    def _get_existing_impression(self, user_id: str) -> Optional[str]:
+        """
+        获取用户现有印象
+        
+        Args:
+            user_id: 用户ID
+            
+        Returns:
+            现有印象文本，如果不存在则返回None
+        """
+        try:
+            impression = UserImpression.select().where(
+                UserImpression.user_id == user_id
+            ).first()
+            
+            if impression and impression.personality_traits:
+                return impression.personality_traits
+            return None
+            
+        except Exception as e:
+            logger.error(f"获取现有印象失败: {str(e)}")
+            return None
+    
+    def _build_update_prompt(self, existing_impression: Optional[str], history_context: str, message: str) -> str:
+        """
+        构建增量更新印象的提示词
+        
+        Args:
+            existing_impression: 现有印象
+            history_context: 历史上下文
+            message: 当前消息
+            
+        Returns:
+            增量更新提示词
+        """
+        template = self.prompts_config.get("impression_template", "").strip()
+
+        # 从配置获取长度限制
+        max_history_chars = self.config.get("prompts", {}).get("max_history_chars", 2000)
+        max_message_chars = self.config.get("prompts", {}).get("max_message_chars", 500)
+
+        if template:
+            return template.format(
+                existing_impression=existing_impression or "暂无印象",
+                history_context=history_context[:max_history_chars],
+                message=message[:max_message_chars]
+            )
+
+        # 默认增量更新提示词
+        if existing_impression:
+            return f"""你是一个擅长人物印象分析的心理学家。现在需要基于新的对话信息，更新对用户的印象。
+
+当前用户印象：{existing_impression}
+
+历史对话上下文：{history_context[:max_history_chars] if len(history_context) > max_history_chars else history_context}
+
+当前新消息：{message[:max_message_chars] if len(message) > max_message_chars else message}
+
+请基于新信息更新用户印象，要求：
+1. 保持原有印象中依然准确的部分
+2. 根据新信息补充或修正印象
+3. 语言要自然流畅，50-100字
+4. 如果新信息与原有印象冲突，以新信息为准但保持表达委婉
+5. 如果信息不足，可以用'似乎'、'看起来'等词
+
+只返回更新后的印象描述，不要其他解释。"""
+        else:
+            # 如果没有现有印象，使用原始的印象构建提示词
+            return self._build_prompt(history_context, message)
+    
+    def _save_impression_update(self, user_id: str, impression_text: str) -> bool:
+        """
+        保存用户印象到数据库（更新方式）
+        
+        Args:
+            user_id: 用户ID
+            impression_text: 印象文本
+            
+        Returns:
+            是否保存成功
+        """
+        try:
+            # 获取或创建用户印象记录
+            impression, created = UserImpression.get_or_create(
+                user_id=user_id,
+                defaults={
+                    'personality_traits': impression_text,
+                    'updated_at': datetime.now()
+                }
+            )
+            
+            if not created:
+                # 使用更新方式
+                impression.set_impression_with_version(impression_text)
+                impression.save()
+                
+                # 记录版本变化
+                change_summary = impression.get_impression_change_summary()
+                logger.debug(f"印象更新: 用户 {user_id}, {change_summary}")
             
             logger.debug(f"印象已保存: 用户 {user_id}, 印象: {impression_text[:50]}...")
             return True
