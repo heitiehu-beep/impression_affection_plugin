@@ -134,44 +134,75 @@ class ImpressionUpdateHandler(BaseEventHandler):
             # 使用标准化的用户ID提取方法
             from .services.message_service import MessageService
 
-            # 优先使用reply对象（群聊回复场景）
-            # 在群聊中，当Bot回复某个用户时，reply.user_id是被回复的目标用户
-            if hasattr(event_data, 'reply') and event_data.reply and hasattr(event_data.reply, 'user_id'):
-                raw_user_id = event_data.reply.user_id
-                user_id = MessageService.normalize_user_id(raw_user_id)
-                message = event_data
-                logger.debug(f"从reply对象提取用户ID: {user_id} (原始: {raw_user_id})")
-            elif hasattr(event_data, 'message_base_info'):
-                message = event_data
-                raw_user_id = message.message_base_info.get('user_id', '')
-                user_id = MessageService.normalize_user_id(raw_user_id)
-                logger.debug(f"从message_base_info提取用户ID: {user_id} (原始: {raw_user_id})")
-            elif hasattr(event_data, 'user_id'):
-                raw_user_id = event_data.user_id
-                user_id = MessageService.normalize_user_id(raw_user_id)
-                message = event_data
-                logger.debug(f"从event_data.user_id提取用户ID: {user_id} (原始: {raw_user_id})")
-            elif hasattr(event_data, 'plain_text'):
-                raw_user_id = getattr(event_data, 'user_id', '')
-                user_id = MessageService.normalize_user_id(raw_user_id)
-                message = event_data
-                logger.debug(f"从plain_text分支提取用户ID: {user_id} (原始: {raw_user_id})")
-            else:
-                # 尝试从事件数据中提取消息
-                if hasattr(event_data, '__dict__'):
-                    for attr_name in ['message', 'msg', 'data']:
-                        if hasattr(event_data, attr_name):
-                            potential_msg = getattr(event_data, attr_name)
-                            if hasattr(potential_msg, 'user_id'):
-                                raw_user_id = potential_msg.user_id
-                                user_id = MessageService.normalize_user_id(raw_user_id)
-                                message = potential_msg
-                                logger.debug(f"从{attr_name}属性提取用户ID: {user_id}")
-                                break
+            # v7修复：从ChatStream.context的最后消息的reply字段获取回复目标用户ID
+            # v6修复失败原因：ChatStream.user_info.user_id是聊天流用户，不是Bot回复的目标用户
+            # v7正确方案：通过last_message.reply获取被回复用户ID
+            if hasattr(event_data, 'stream_id') and event_data.stream_id:
+                try:
+                    from src.chat.message_receive.chat_stream import get_chat_manager
+                    chat_manager = get_chat_manager()
+                    target_stream = chat_manager.get_stream(event_data.stream_id)
 
-                if not user_id:
-                    logger.error(f"无法从事件数据中提取用户ID: {event_data}")
-                    return CustomEventHandlerResult(message="无法从事件数据中提取用户ID")
+                    if target_stream and target_stream.context:
+                        last_message = target_stream.context.get_last_message()
+
+                        if last_message:
+                            # 检查是否有回复关系（群聊@回复场景）
+                            if hasattr(last_message, 'reply') and last_message.reply:
+                                # Bot回复给了特定用户，获取被回复用户的ID
+                                raw_user_id = last_message.reply.message_info.user_info.user_id
+                                user_id = MessageService.normalize_user_id(raw_user_id)
+                                message = event_data
+                                logger.debug(f"从reply字段获取目标用户ID: {user_id} (原始: {raw_user_id})")
+                            else:
+                                # 没有@回复，则目标是当前消息的发送者
+                                raw_user_id = last_message.message_info.user_info.user_id
+                                user_id = MessageService.normalize_user_id(raw_user_id)
+                                message = event_data
+                                logger.debug(f"从当前消息发送者获取目标用户ID: {user_id} (原始: {raw_user_id})")
+                except Exception as e:
+                    logger.warning(f"从ChatStream获取用户ID失败: {str(e)}")
+
+            # 如果从stream_id获取失败，fallback到原有逻辑
+            if not user_id:
+                # 优先使用reply对象（群聊回复场景）
+                # 在群聊中，当Bot回复某个用户时，reply.user_id是被回复的目标用户
+                if hasattr(event_data, 'reply') and event_data.reply and hasattr(event_data.reply, 'user_id'):
+                    raw_user_id = event_data.reply.user_id
+                    user_id = MessageService.normalize_user_id(raw_user_id)
+                    message = event_data
+                    logger.debug(f"从reply对象提取用户ID: {user_id} (原始: {raw_user_id})")
+                elif hasattr(event_data, 'message_base_info'):
+                    message = event_data
+                    raw_user_id = message.message_base_info.get('user_id', '')
+                    user_id = MessageService.normalize_user_id(raw_user_id)
+                    logger.debug(f"从message_base_info提取用户ID: {user_id} (原始: {raw_user_id})")
+                elif hasattr(event_data, 'user_id'):
+                    raw_user_id = event_data.user_id
+                    user_id = MessageService.normalize_user_id(raw_user_id)
+                    message = event_data
+                    logger.debug(f"从event_data.user_id提取用户ID: {user_id} (原始: {raw_user_id})")
+                elif hasattr(event_data, 'plain_text'):
+                    raw_user_id = getattr(event_data, 'user_id', '')
+                    user_id = MessageService.normalize_user_id(raw_user_id)
+                    message = event_data
+                    logger.debug(f"从plain_text分支提取用户ID: {user_id} (原始: {raw_user_id})")
+                else:
+                    # 尝试从事件数据中提取消息
+                    if hasattr(event_data, '__dict__'):
+                        for attr_name in ['message', 'msg', 'data']:
+                            if hasattr(event_data, attr_name):
+                                potential_msg = getattr(event_data, attr_name)
+                                if hasattr(potential_msg, 'user_id'):
+                                    raw_user_id = potential_msg.user_id
+                                    user_id = MessageService.normalize_user_id(raw_user_id)
+                                    message = potential_msg
+                                    logger.debug(f"从{attr_name}属性提取用户ID: {user_id}")
+                                    break
+
+                    if not user_id:
+                        logger.error(f"无法从事件数据中提取用户ID: {event_data}")
+                        return CustomEventHandlerResult(message="无法从事件数据中提取用户ID")
 
             if not user_id:
                 logger.error(f"用户ID为空")
