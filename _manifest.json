@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "name": "印象和好感度系统插件",
-  "version": "2.3.2",
+  "version": "2.3.3",
   "description": "为麦麦添加动态印象和好感度系统，LLM生成自然语言印象和动态好感度更新，使用独立的impression_affection_data.db数据库",
   "author": {
     "name": "heitiehu-beep",
