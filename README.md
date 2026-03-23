@@ -1,4 +1,4 @@
-# 印象和好感度系统插件 v3.0.0
+# 印象和好感度系统插件 v2.5.0
 
 基于LLM分析用户行为和消息，构建用户画像并维护好感度关系
 
@@ -364,7 +364,7 @@ impression_affection_plugin-main/
 
 版本历史
 
-v3.0.0 ✨ 新功能版本
+v2.5.0 ✨ 新功能版本
 【新增功能】
 - ✅ 难度等级系统：5 个难度级别（easy/normal/hard/very_hard/nightmare）
 - ✅ Nightmare 模式：最高难度，聊天可增加也可减少好感度
