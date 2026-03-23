@@ -305,7 +305,7 @@ class ImpressionUpdateHandler(BaseEventHandler):
 
 @register_plugin
 class ImpressionAffectionPlugin(BasePlugin):
-    """印象和好感度系统插件 v3.0.0"""
+    """印象和好感度系统插件 v2.5.0"""
     plugin_name = "impression_affection_plugin"
     enable_plugin = True
     dependencies = []
@@ -322,7 +322,7 @@ class ImpressionAffectionPlugin(BasePlugin):
             ),
             "config_version": ConfigField(
                 type=str,
-                default="3.0.0",
+                default="2.5.0",
                 description="配置文件版本"
             )
         },
