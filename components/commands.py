@@ -2,13 +2,51 @@
 命令组件 - 管理命令
 """
 
-from typing import Optional
+from typing import Optional, List
 from src.plugin_system import BaseCommand
 
 from ..models import UserImpression, UserMessageState
+from ..utils.helpers import get_affection_level
+
+class BaseImpressionCommand(BaseCommand):
+    """提供权限检查功能"""
+
+    def _check_permission(self) -> bool:
+        """
+        检查用户是否有权限使用命令
+        如果配置 allowed_users 为空列表，允许所有人使用
+        如果配置了指定用户ID，只有这些用户能使用
+        """
+        # 获取命令配置
+        commands_config = self.plugin_config.get("commands", {})
+        allowed_users = commands_config.get("allowed_users", [])
+
+        # 如果没有设置允许列表（空列表），允许所有人
+        if not allowed_users:
+            return True
+
+        # 获取当前用户ID（发送命令的人）
+        current_user_id = None
+
+        # 尝试多种可能的属性获取方式
+        if hasattr(self, 'user_id'):
+            current_user_id = self.user_id
+        elif hasattr(self, 'event') and hasattr(self.event, 'user_id'):
+            current_user_id = self.event.user_id
+        elif hasattr(self, 'message') and hasattr(self.message, 'user_id'):
+            current_user_id = self.message.user_id
+
+        if not current_user_id:
+            return False
+
+        # 标准化比较（都转为字符串）
+        current_user_id_str = str(current_user_id).strip()
+        allowed_list = [str(uid).strip() for uid in allowed_users]
+
+        return current_user_id_str in allowed_list
 
 
-class ViewImpressionCommand(BaseCommand):
+class ViewImpressionCommand(BaseImpressionCommand):
     """查看印象命令"""
 
     command_name = "view_impression"
@@ -18,6 +56,10 @@ class ViewImpressionCommand(BaseCommand):
     async def execute(self) -> tuple:
         """执行查看印象"""
         try:
+            # 权限检查 - 静默拒绝（无权限直接返回，不提示）
+            if not self._check_permission():
+                return False, "权限不足", False
+
             user_id = self.matched_groups.get("user_id")
             if not user_id:
                 await self.send_text("请提供用户ID")
@@ -59,7 +101,7 @@ class ViewImpressionCommand(BaseCommand):
             return False, error_msg, False
 
 
-class SetAffectionCommand(BaseCommand):
+class SetAffectionCommand(BaseImpressionCommand):
     """手动设置好感度命令"""
 
     command_name = "set_affection"
@@ -69,6 +111,10 @@ class SetAffectionCommand(BaseCommand):
     async def execute(self) -> tuple:
         """执行设置好感度"""
         try:
+            # 权限检查
+            if not self._check_permission():
+                return False, "权限不足", False
+
             user_id = self.matched_groups.get("user_id")
             score_str = self.matched_groups.get("score")
 
@@ -90,7 +136,7 @@ class SetAffectionCommand(BaseCommand):
 
             # 更新好感度
             impression.affection_score = score
-            impression.affection_level = self._get_affection_level(score)
+            impression.affection_level = get_affection_level(score)
             impression.save()
 
             action = "创建" if created else "更新"
@@ -103,13 +149,8 @@ class SetAffectionCommand(BaseCommand):
             await self.send_text(error_msg)
             return False, error_msg, False
 
-    def _get_affection_level(self, score: float) -> str:
-        """根据分数获取好感度等级"""
-        from ..utils import get_affection_level
-        return get_affection_level(score)
 
-
-class ListImpressionsCommand(BaseCommand):
+class ListImpressionsCommand(BaseImpressionCommand):
     """列出所有印象命令"""
 
     command_name = "list_impressions"
@@ -119,6 +160,10 @@ class ListImpressionsCommand(BaseCommand):
     async def execute(self) -> tuple:
         """执行列出印象"""
         try:
+            # 权限检查 - 静默拒绝
+            if not self._check_permission():
+                return False, "权限不足", False
+
             # 获取所有印象
             impressions = UserImpression.select()
 
